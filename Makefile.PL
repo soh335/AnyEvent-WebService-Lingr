@@ -26,6 +26,10 @@ use inc::Module::Install;
 
 all_from 'lib/AnyEvent/WebService/Lingr.pm';
 
+requires 'AnyEvent::HTTP';
+requires 'URI';
+requires 'JSON';
+requires 'HTTP::Request::Common';
 
 test_requires 'Test::More'     => '0.88';
 test_requires 'Test::Requires' => '0.06';

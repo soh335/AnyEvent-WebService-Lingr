@@ -5,6 +5,88 @@ use warnings;
 
 our $VERSION = '0.01';
 
+use AnyEvent;
+use AnyEvent::HTTP;
+use HTTP::Request::Common;
+use URI;
+use Carp;
+use JSON;
+
+our $BASE_URL = "http://lingr.com/api";
+our $OBSERVE_URL = "http://lingr.com:8080/api";
+our %METHODS = (
+    "session/create"    => "POST",
+    "session/verify"    => "GET",
+    "session/destroy"   => "POST",
+    "room/show"         => "GET",
+    "room/get_archives" => "GET",
+    "room/subscribe"    => "POST",
+    "room/unsubscribe"  => "POST",
+    "room/say"          => "POST",
+    "user/get_rooms"    => "GET",
+    "event/observe"     => "GET",
+);
+
+sub new {
+    my ($class, %args) = @_;
+
+    croak "missing require parameter 'user" unless defined $args{user};
+    croak "missing require parameter 'passowrd" unless defined $args{password};
+
+    bless \%args, $class;
+}
+
+sub session_create {
+    my ($self, $cb) = @_;
+
+    my %param = ( user => $self->{user}, password => $self->{password} );
+    $param{app_key} = $self->{app_key} if defined $self->{app_key};
+
+    my $method = "session/create";
+    my $req = $self->_get_req($BASE_URL . "/$method", $METHODS{$method}, \%param);
+    $self->_do_request($METHODS{$method}, $req, sub {
+        my $json = shift;
+        $self->{session} = $json->{session};
+        $cb->($json);
+    });
+}
+
+sub request {
+    my ($self, $method, %args) = @_;
+    croak "not defined method" unless defined $METHODS{$method};
+    my $cb = delete $args{cb};
+    $args{session} ||= $self->{session};
+
+    my $url = ( $method ne "event/observe" ? $BASE_URL : $OBSERVE_URL ) . "/$method";
+
+    my $req = $self->_get_req($url, $METHODS{$method}, \%args);
+    $self->_do_request($METHODS{$method}, $req, $cb);
+}
+
+sub _get_req {
+    my ($self, $url, $method, $param) = @_;
+
+    if ( $method eq "GET" ) {
+        my $uri = URI->new($url);
+        $uri->query_form( %$param );
+
+        return GET $uri;
+    }
+    elsif ( $method eq "POST" ) {
+        return POST $url, [%$param];
+    }
+}
+
+sub _do_request {
+    my ($self, $method, $req, $cb) = @_;
+
+    my %headers = map { $_ => $req->header($_), } $req->headers->header_field_names;
+    http_request $method => $req->uri, body => $req->content, headers => \%headers, sub {
+        my ($body, $hdr) = @_;
+        my $json = decode_json($body);
+        $cb->($json);
+    };
+}
 
 1;
 __END__
