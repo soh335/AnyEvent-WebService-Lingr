@@ -45,9 +45,11 @@ sub session_create {
     my $method = "session/create";
     my $req = $self->_get_req($BASE_URL . "/$method", $METHODS{$method}, \%param);
     $self->_do_request($METHODS{$method}, $req, sub {
-        my $json = shift;
+        my ($hdr, $json, $reason) = @_;
+
+        croak $reason unless $json;
         $self->{session} = $json->{session};
-        $cb->($json);
+        $cb->($hdr, $json, $reason);
     });
 }
 
@@ -83,8 +85,14 @@ sub _do_request {
     my %headers = map { $_ => $req->header($_), } $req->headers->header_field_names;
     http_request $method => $req->uri, body => $req->content, headers => \%headers, sub {
         my ($body, $hdr) = @_;
-        my $json = decode_json($body);
-        $cb->($json);
+        if ( $hdr->{Status} =~ /^2/ ) {
+            local $@;
+            my $json = eval { decode_json($body) };
+            $cb->($hdr, $json, $@ ? "parse error: $@" : $hdr->{Reason});
+        }
+        else {
+            $cb->($hdr, undef, $hdr->{Reason});
+        }
     };
 }
 
