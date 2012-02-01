@@ -10,6 +10,7 @@ use Encode qw/encode_utf8/;
 use Config::Pit;
 use FindBin;
 use Path::Class qw/file/;
+use Log::Minimal;
 
 my $lingr = AnyEvent::WebService::Lingr->new(
     %{ pit_get("lingr.com") }
@@ -20,11 +21,11 @@ async {
 
     if ( -e $file ) {
         $lingr->request("session/verify", session => $file->slurp, cb => Coro::rouse_cb);
-        my $json = Coro::rouse_wait;
+        my ($hdr, $json, $reason) = Coro::rouse_wait;
 
         if ( $json->{status} eq "ok" ) {
             $lingr->{session} = $json->{session};
-            warn "session is verify";
+            infof "session is verify";
         }
         elsif ( $json->{code} eq "invalid_session" ) {
             create_session();
@@ -35,26 +36,26 @@ async {
     }
 
     $lingr->request("user/get_rooms", cb => Coro::rouse_cb);
-    my $json = Coro::rouse_wait;
+    my ($hdr, $json, $reason) = Coro::rouse_wait;
 
-    check_json($json);
+    check_response($hdr, $json, $reason);
 
     $lingr->request("room/subscribe", room => join (",", @{$json->{rooms}}), cb => Coro::rouse_cb);
-    $json = Coro::rouse_wait;
+    ($hdr, $json, $reason) = Coro::rouse_wait;
 
-    check_json($json);
+    check_response($hdr, $json, $reason);
 
     my $counter = $json->{counter};
     while (1) {
         $lingr->request("event/observe", counter => $counter, cb => Coro::rouse_cb);
-        my $res_json = Coro::rouse_wait;
+        ($hdr, $json, $reason) = Coro::rouse_wait;
 
-        check_json($res_json);
+        check_response($hdr, $json, $reason);
 
-        for my $event (@{$res_json->{events}} ) {
-            warn encode_utf8 $event->{message}{text} if $event->{message};
+        for my $event (@{$json->{events}} ) {
+            infof encode_utf8 $event->{message}{text} if $event->{message};
         }
-        $counter = $res_json->{counter} if defined $res_json->{counter};
+        $counter = $json->{counter} if defined $json->{counter};
     }
 };
 
@@ -62,20 +63,22 @@ AE::cv->recv;
 
 sub create_session {
     $lingr->session_create(Coro::rouse_cb);
-    my $json = Coro::rouse_wait;
+    my ($hdr, $json, $reason) = Coro::rouse_wait;
 
-    check_json($json);
+    check_response($hdr, $json, $reason);
 
-    my $fh =$file->openw or die $!;
+    my $fh =$file->openw or croakf $!;
     $fh->print($json->{session});
     $fh->close;
 
-    warn "create new session";
+    infof "create new session";
 }
 
-sub check_json {
-    my $json = shift;
-    die $json->{code} . ":" . $json->{detail} unless $json->{status} eq "ok";
+sub check_response {
+    my ($hdr, $json, $reason) = @_;
+
+    croakf $reason unless $json;
+    croakf $json->{code} . ":" . $json->{detail} unless $json->{status} eq "ok";
 }
 
 # callback style
