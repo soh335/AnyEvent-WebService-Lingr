@@ -13,7 +13,8 @@ use Path::Class qw/file/;
 use Log::Minimal;
 
 my $lingr = AnyEvent::WebService::Lingr->new(
-    %{ pit_get("lingr.com") }
+    %{ pit_get("lingr.com") },
+    timeout => 100,
 );
 my $file = file($FindBin::Bin, "session");
 
@@ -50,6 +51,10 @@ async {
         $lingr->request("event/observe", counter => $counter, cb => Coro::rouse_cb);
         ($hdr, $json, $reason) = Coro::rouse_wait;
 
+        if ( $reason eq "Operation timed out" ) {
+            warnf "timeout";
+            next;
+        }
         check_response($hdr, $json, $reason);
 
         for my $event (@{$json->{events}} ) {
