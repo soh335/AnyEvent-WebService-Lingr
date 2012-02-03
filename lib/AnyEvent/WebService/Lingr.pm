@@ -83,7 +83,15 @@ sub _do_request {
     my ($self, $method, $req, $cb) = @_;
 
     my %headers = map { $_ => $req->header($_), } $req->headers->header_field_names;
-    http_request $method => $req->uri, body => $req->content, headers => \%headers, sub {
+
+    my %params = (
+        body => $req->content,
+        headers => \%headers,
+    );
+
+    $params{timeout} = $self->{timeout} if defined $self->{timeout};
+
+    http_request $method => $req->uri, %params, sub {
         my ($body, $hdr) = @_;
         if ( $hdr->{Status} =~ /^2/ ) {
             local $@;
