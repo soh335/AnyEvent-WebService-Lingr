@@ -43,7 +43,7 @@ sub session_create {
     $param{app_key} = $self->{app_key} if defined $self->{app_key};
 
     my $method = "session/create";
-    my $req = $self->_get_req($BASE_URL . "/$method", $METHODS{$method}, \%param);
+    my $req = $self->_gen_request($BASE_URL . "/$method", $METHODS{$method}, \%param);
     $self->_do_request($METHODS{$method}, $req, sub {
         my ($hdr, $json, $reason) = @_;
 
@@ -61,11 +61,11 @@ sub request {
 
     my $url = ( $method ne "event/observe" ? $BASE_URL : $OBSERVE_URL ) . "/$method";
 
-    my $req = $self->_get_req($url, $METHODS{$method}, \%args);
+    my $req = $self->_gen_request($url, $METHODS{$method}, \%args);
     $self->_do_request($METHODS{$method}, $req, $cb);
 }
 
-sub _get_req {
+sub _gen_request {
     my ($self, $url, $method, $param) = @_;
 
     if ( $method eq "GET" ) {
