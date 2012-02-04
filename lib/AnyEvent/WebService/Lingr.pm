@@ -54,10 +54,11 @@ sub session_create {
 }
 
 sub request {
+    my $cb = pop;
+
     my ($self, $method, %args) = @_;
     croak "not defined method" unless defined $METHODS{$method};
-    my $cb = delete $args{cb};
-    $args{session} ||= $self->{session};
+    $args{session} ||= $self->{session} if $self->{session};
 
     my $url = ( $method ne "event/observe" ? $BASE_URL : $OBSERVE_URL ) . "/$method";
 
