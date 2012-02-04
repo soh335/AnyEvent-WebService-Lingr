@@ -36,7 +36,7 @@ sub new {
     bless \%args, $class;
 }
 
-sub session_create {
+sub create_session {
     my ($self, $cb) = @_;
 
     my %param = ( user => $self->{user}, password => $self->{password} );
@@ -47,8 +47,24 @@ sub session_create {
     $self->_do_request($METHODS{$method}, $req, sub {
         my ($hdr, $json, $reason) = @_;
 
-        croak $reason unless $json;
-        $self->{session} = $json->{session};
+        if ( defined $json and $json->{status} eq "ok" ) {
+            $self->{session} = $json->{session};
+        }
+
+        $cb->($hdr, $json, $reason);
+    });
+}
+
+sub destroy_session {
+    my ($self, $cb) = @_;
+
+    $self->request("session/destroy", sub {
+        my ($hdr, $json, $reason) = @_;
+
+        if ( defined $json and $json->{status} eq "ok" ) {
+            $self->{session} = undef;
+        }
+
         $cb->($hdr, $json, $reason);
     });
 }
