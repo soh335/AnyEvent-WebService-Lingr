@@ -69,6 +69,20 @@ sub destroy_session {
     });
 }
 
+sub verify_session {
+    my ($self, $session, $cb) = @_;
+
+    $self->request("session/verify", session => $session, sub {
+        my ($hdr, $json, $reason) = @_;
+
+        if ( defined $json and $json->{status} eq "ok" ) {
+            $self->{session} = $session;
+        }
+
+        $cb->($hdr, $json, $reason);
+    });
+}
+
 sub request {
     my $cb = pop;
 
