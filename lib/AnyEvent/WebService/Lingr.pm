@@ -90,7 +90,7 @@ sub request {
     my $url = ( $method ne "event/observe" ? $BASE_URL : $OBSERVE_URL ) . "/$method";
 
     my $req = $self->_gen_request($url, $METHODS{$method}, \%args);
-    $self->_do_request($METHODS{$method}, $req, $cb);
+    $self->_do_request($req, $cb);
 }
 
 sub _gen_request {
@@ -108,7 +108,7 @@ sub _gen_request {
 }
 
 sub _do_request {
-    my ($self, $method, $req, $cb) = @_;
+    my ($self, $req, $cb) = @_;
 
     my %headers = map { $_ => $req->header($_), } $req->headers->header_field_names;
 
@@ -119,7 +119,7 @@ sub _do_request {
 
     $params{timeout} = $self->{timeout} if $self->{timeout};
 
-    http_request $method => $req->uri, %params, sub {
+    http_request $req->method => $req->uri, %params, sub {
         my ($body, $hdr) = @_;
         if ( $hdr->{Status} =~ /^2/ ) {
             local $@;
