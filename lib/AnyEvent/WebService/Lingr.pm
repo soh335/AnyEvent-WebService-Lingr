@@ -45,9 +45,7 @@ sub create_session {
     $self->request("session/create", %param, sub {
         my ($hdr, $json, $reason) = @_;
 
-        if ( defined $json and $json->{status} eq "ok" ) {
-            $self->{session} = $json->{session};
-        }
+        $self->{session} = $session if defined $json and $json->{status} eq "ok";
 
         $cb->($hdr, $json, $reason);
     });
@@ -59,9 +57,7 @@ sub destroy_session {
     $self->request("session/destroy", sub {
         my ($hdr, $json, $reason) = @_;
 
-        if ( defined $json and $json->{status} eq "ok" ) {
-            $self->{session} = undef;
-        }
+        $self->{session} = undef if defined $json and $json->{status} eq "ok";
 
         $cb->($hdr, $json, $reason);
     });
@@ -73,9 +69,7 @@ sub verify_session {
     $self->request("session/verify", session => $session, sub {
         my ($hdr, $json, $reason) = @_;
 
-        if ( defined $json and $json->{status} eq "ok" ) {
-            $self->{session} = $session;
-        }
+        $self->{session} = $session if defined $json and $json->{status} eq "ok";
 
         $cb->($hdr, $json, $reason);
     });
