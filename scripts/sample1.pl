@@ -4,6 +4,7 @@ use utf8;
 
 use AnyEvent;
 use Coro;
+use Coro::Timer;
 use Coro::AnyEvent;
 use AnyEvent::WebService::Lingr;
 use Encode qw/encode_utf8/;
@@ -11,6 +12,7 @@ use Config::Pit;
 use FindBin;
 use Path::Class qw/file/;
 use Log::Minimal;
+use Try::Tiny;
 
 my $lingr = AnyEvent::WebService::Lingr->new(
     %{ pit_get("lingr.com") },
@@ -21,35 +23,35 @@ my $file = file($FindBin::Bin, "session");
 async {
 
     if ( -e $file ) {
-        $lingr->request("session/verify", session => $file->slurp, cb => Coro::rouse_cb);
+        $lingr->request("session/verify", session => $file->slurp, Coro::rouse_cb);
         my ($hdr, $json, $reason) = Coro::rouse_wait;
 
-        if ( $json->{status} eq "ok" ) {
-            $lingr->{session} = $json->{session};
+        try {
+            check_response($hdr, $json, $reason);
             infof "session is verify";
         }
-        elsif ( $json->{code} eq "invalid_session" ) {
+        catch {
             create_session();
-        }
+        };
     }
     else {
         create_session();
     }
 
-    $lingr->request("user/get_rooms", cb => Coro::rouse_cb);
+    $lingr->request("user/get_rooms", Coro::rouse_cb);
     my ($hdr, $json, $reason) = Coro::rouse_wait;
 
     check_response($hdr, $json, $reason);
 
-    $lingr->request("room/subscribe", room => join (",", @{$json->{rooms}}), cb => Coro::rouse_cb);
+    $lingr->request("room/subscribe", room => join (",", @{$json->{rooms}}), Coro::rouse_cb);
     ($hdr, $json, $reason) = Coro::rouse_wait;
 
     check_response($hdr, $json, $reason);
 
     my $counter = $json->{counter};
     while (1) {
-        $lingr->request("event/observe", counter => $counter, cb => Coro::rouse_cb);
-        ($hdr, $json, $reason) = Coro::rouse_wait;
+        $lingr->request("event/observe", counter => $counter, Coro::rouse_cb);
+        my ($hdr, $json, $reason) = Coro::rouse_wait;
 
         if ( $reason eq "Operation timed out" ) {
             warnf "timeout";
@@ -67,12 +69,12 @@ async {
 AE::cv->recv;
 
 sub create_session {
-    $lingr->session_create(Coro::rouse_cb);
+    $lingr->create_session(Coro::rouse_cb);
     my ($hdr, $json, $reason) = Coro::rouse_wait;
 
     check_response($hdr, $json, $reason);
 
-    my $fh =$file->openw or croakf $!;
+    my $fh = $file->openw or croakf $!;
     $fh->print($json->{session});
     $fh->close;
 
@@ -81,30 +83,7 @@ sub create_session {
 
 sub check_response {
     my ($hdr, $json, $reason) = @_;
-
-    croakf $reason unless $json;
-    croakf $json->{code} . ":" . $json->{detail} unless $json->{status} eq "ok";
+    croakf Dumper($hdr, $reason) unless $json;
+    croakf Dumper($hdr, $json->{code} . ":" . $json->{detail}) unless $json->{status} eq "ok";
 }
 
-# callback style
-#
-#$lingr->request("user/get_rooms", cb => sub {
-#        my $json = shift;
-#        $lingr->request("room/subscribe", room => join (",", @{$json->{rooms}}), cb => sub {
-#                $json = shift;
-#
-#                my $func; $func = sub {
-#                    my $counter = shift;
-#                    $lingr->request("event/observe", counter => $counter, cb => sub {
-#                            my $_json = shift;
-#                            for my $event (@{$_json->{events}} ) {
-#                                warn encode_utf8 $event->{message}{text} if $event->{message};
-#                            }
-#                            $func->($_json->{counter} || $counter);
-#                        });
-#                };
-#
-#                $func->($json->{counter});
-#            });
-#    });
-#
