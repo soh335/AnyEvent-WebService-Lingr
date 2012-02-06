@@ -13,31 +13,31 @@ use Carp;
 sub new {
     my ($class, %args) = @_;
 
-    croak "missing require parameter 'room" unless defined $args{room};
-    croak "missing require parameter 'bot_secret" unless defined $args{bot_secret};
-    croak "missing require parameter 'bot" unless defined $args{bot};
+    my $room = $args{room} or croak "missing require parameter 'room'";
+    my $bot_secret = $args{bot_secret} or croak "missing require parameter 'bot_secret'";
+    my $bot = $args{bot} or croak "missing require parameter 'bot'";
 
-    bless { 
-        room          => $args{room}, 
-        bot_id        => $args{bot_id}, 
-        bot_verifier  => sha1_hex($args{bot_id} . $args{bot_secret}),
+    bless {
+        room         => $room,
+        bot          => $bot,
+        bot_verifier => sha1_hex($bot . $bot_secret),
     }, $class;
 }
 
 sub say {
     my ($self, $text, $cb) = @_;
 
-    my $req = AnyEvent::WebService::Lingr->_get_req(
+    my $req = AnyEvent::WebService::Lingr->_gen_request(
         $AnyEvent::WebService::Lingr::BASE_URI . "/room/say",
         "POST",
-        { 
+        {
             room          => $self->{room},
-            bod           => $self->{bot},
+            bot           => $self->{bot},
             text          => $text,
             bot_verifier  => $self->{bot_verifier},
         }
     );
-    AnyEvent::WebService::Lingr->_do_request("POST", $req, $cb);
+    AnyEvent::WebService::Lingr->_do_request($req, $cb);
 }
 
 1;
