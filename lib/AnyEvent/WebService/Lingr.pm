@@ -42,9 +42,7 @@ sub create_session {
     my %param = ( user => $self->{user}, password => $self->{password} );
     $param{app_key} = $self->{app_key} if defined $self->{app_key};
 
-    my $method = "session/create";
-    my $req = $self->_gen_request($BASE_URL . "/$method", $METHODS{$method}, \%param);
-    $self->_do_request($METHODS{$method}, $req, sub {
+    $self->request("session/create", %param, sub {
         my ($hdr, $json, $reason) = @_;
 
         if ( defined $json and $json->{status} eq "ok" ) {
