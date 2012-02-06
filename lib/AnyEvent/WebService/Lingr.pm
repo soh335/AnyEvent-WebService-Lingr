@@ -30,22 +30,27 @@ our %METHODS = (
 sub new {
     my ($class, %args) = @_;
 
-    croak "missing require parameter 'user" unless defined $args{user};
-    croak "missing require parameter 'passowrd" unless defined $args{password};
+    my $user = $args{user} or croak "missing require parameter 'user'";
+    my $password = $args{password} or croak "missing require parameter 'passowrd'";
 
-    bless \%args, $class;
+    bless {
+        user     => $user,
+        password => $password,
+        app_key  => $args{app_key},
+        timeout  => $args{timeout},
+    }, $class;
 }
 
 sub create_session {
     my ($self, $cb) = @_;
 
     my %param = ( user => $self->{user}, password => $self->{password} );
-    $param{app_key} = $self->{app_key} if defined $self->{app_key};
+    $param{app_key} = $self->{app_key} if $self->{app_key};
 
     $self->request("session/create", %param, sub {
         my ($hdr, $json, $reason) = @_;
 
-        $self->{session} = $session if defined $json and $json->{status} eq "ok";
+        $self->{session} = $json->{session} if defined $json and $json->{status} eq "ok";
 
         $cb->($hdr, $json, $reason);
     });
@@ -112,7 +117,7 @@ sub _do_request {
         headers => \%headers,
     );
 
-    $params{timeout} = $self->{timeout} if defined $self->{timeout};
+    $params{timeout} = $self->{timeout} if $self->{timeout};
 
     http_request $method => $req->uri, %params, sub {
         my ($body, $hdr) = @_;
